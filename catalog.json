@@ -1,0 +1,14 @@
+{
+ "lessons": [
+  {
+   "slug": "differential-equations",
+   "title": "Differential equations, step by step",
+   "subtitle": "A friendly first tour",
+   "duration": 291.423,
+   "chapters": 12,
+   "questions": 5,
+   "cover": "cover.png",
+   "version": "119ccc8d6626"
+  }
+ ]
+}

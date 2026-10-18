@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lessons</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Literata:opsz,wght@7..72,400;7..72,600&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&display=swap">
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="stylesheet" href="shared/student.css">
+<script src="config.js"></script>
+</head>
+<body>
+<main class="page">
+  <div class="topbar">
+    <a class="wordmark" href="./"><i></i><span id="siteName">Lesson Lab</span></a>
+    <span id="who" class="muted"></span>
+  </div>
+  <section class="hero">
+    <h1 id="title">Lessons</h1>
+    <p id="intro">Watch and listen, then take the quiz at the end of each lesson.</p>
+  </section>
+  <section class="account" id="account" hidden></section>
+  <section class="grid" id="grid"></section>
+</main>
+<script src="shared/students.js"></script>
+<script>
+const S = window.LessonStudents, cfg = window.LESSON_LAB_CONFIG || {};
+const $ = id => document.getElementById(id);
+const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+if (cfg.siteTitle) { $('title').textContent = cfg.siteTitle; document.title = cfg.siteTitle; }
+if (cfg.siteIntro) $('intro').textContent = cfg.siteIntro;
+if (cfg.teacherName) $('siteName').textContent = cfg.teacherName;
+
+async function renderAccount() {
+  const box = $('account'); box.textContent = '';
+  if (!S.enabled) { box.hidden = true; return; }
+  box.hidden = false;
+  const err = S.takeAuthError();
+  const u = await S.user();
+  if (!u) {
+    box.append(el('p', 'note', err ? `That sign-in link didn't work (${err}). Request a new one.` : 'Sign in so your quiz scores reach your teacher. You will get a one-time link by email.'));
+    const f = el('form'); const inp = el('input'); inp.type = 'email'; inp.required = true; inp.placeholder = 'you@school.org'; inp.id = 'email'; inp.setAttribute('aria-label', 'Email');
+    const b = el('button', 'btn primary', 'Email me a sign-in link'); f.append(inp, b);
+    f.onsubmit = async e => { e.preventDefault(); b.disabled = true;
+      try { await S.sendLink(inp.value.trim()); box.textContent = ''; box.append(el('p', 'note', `Check ${inp.value.trim()} for a sign-in link, and open it on this device.`)); }
+      catch (x) { b.disabled = false; f.append(el('span', 'tag bad', x.message)); } };
+    box.append(f); $('who').textContent = '';
+    return;
+  }
+  if (!u.name) {
+    box.append(el('p', 'note', 'One more step: tell your teacher who you are.'));
+    const f = el('form'); const n = el('input'); n.required = true; n.placeholder = 'Your name'; n.id = 'name'; n.setAttribute('aria-label', 'Your name');
+    const c = el('input'); c.placeholder = 'Class code (if you have one)'; c.id = 'classCode'; c.setAttribute('aria-label', 'Class code');
+    const b = el('button', 'btn primary', 'Save'); f.append(n, c, b);
+    f.onsubmit = async e => { e.preventDefault(); b.disabled = true; try { await S.saveProfile(n.value.trim(), c.value.trim()); renderAccount(); } catch (x) { b.disabled = false; f.append(el('span', 'tag bad', x.message)); } };
+    box.append(f); return;
+  }
+  box.hidden = true;
+  $('who').textContent = '';
+  $('who').append(document.createTextNode(`Signed in as ${u.name} · `));
+  const out = el('button', 'btn quiet', 'Sign out'); out.style.padding = '2px 4px'; out.onclick = () => { S.signOut(); location.reload(); };
+  $('who').append(out);
+}
+
+async function renderLessons() {
+  const grid = $('grid');
+  let cat;
+  try { cat = await (await fetch('catalog.json', { cache: 'no-store' })).json(); }
+  catch { grid.append(el('div', 'empty', 'The lesson list could not be loaded.')); return; }
+  if (!cat.lessons.length) { grid.append(el('div', 'empty', 'No lessons have been published yet.')); return; }
+  const attempts = await S.myAttempts(), prog = S.local.progress();
+  for (const l of cat.lessons) {
+    const a = el('a', 'card'); a.href = `lesson.html?l=${encodeURIComponent(l.slug)}`;
+    if (l.cover) { const img = el('img', 'thumb'); img.src = `lessons/${l.slug}/${l.cover}`; img.alt = ''; img.loading = 'lazy'; a.append(img); }
+    else a.append(el('span', 'thumb'));
+    a.append(el('h2', '', l.title));
+    if (l.subtitle) a.append(el('p', '', l.subtitle));
+    const meta = el('div', 'meta');
+    meta.append(el('span', 'tag', `${Math.max(1, Math.round(l.duration / 60))} min`), el('span', 'tag', `${l.chapters} chapters`));
+    if (l.questions) meta.append(el('span', 'tag', `${l.questions}-question quiz`));
+    const mine = attempts.filter(x => x.slug === l.slug);
+    if (mine.length) { const best = mine.reduce((b, x) => (x.score / x.total > b.score / b.total ? x : b));
+      meta.append(el('span', 'tag ' + (best.score === best.total ? 'good' : 'warn'), `Best ${best.score}/${best.total}`)); }
+    else if (prog[l.slug]?.completed) meta.append(el('span', 'tag good', 'Watched'));
+    else if (prog[l.slug]?.pct > .05) meta.append(el('span', 'tag warn', `${Math.round(prog[l.slug].pct * 100)}% watched`));
+    a.append(meta);
+    grid.append(a);
+  }
+}
+renderAccount(); renderLessons();
+</script>
+</body>
+</html>

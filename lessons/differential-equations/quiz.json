@@ -1,0 +1,52 @@
+{
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "y′ = y² − t. Is this equation linear or nonlinear, and why?",
+      "options": [
+        "Linear, because it's only first order",
+        "Nonlinear, because y appears squared",
+        "Nonlinear, because t appears in it",
+        "Linear, because no derivatives are multiplied together"
+      ],
+      "answer": 1,
+      "explanation": "Linearity is about how the unknown y and its derivatives appear. y² breaks it. The order doesn't matter, and an explicit t only makes the equation non-autonomous, not nonlinear.",
+      "hint": "Look at how the unknown appears, not the independent variable."
+    },
+    {
+      "id": "q2",
+      "prompt": "u_t = α · u_xx is the heat equation. What kind of equation is it?",
+      "options": ["First-order ODE", "Second-order ODE", "Second-order PDE", "First-order PDE"],
+      "answer": 2,
+      "explanation": "u depends on both x and t, so it's a partial differential equation. Its highest derivative, u_xx, is second order.",
+      "hint": "Count the independent variables first."
+    },
+    {
+      "id": "q3",
+      "prompt": "m·y″ + c·y′ + k·y = F(t). Which term is the shock absorber?",
+      "options": ["m·y″", "c·y′", "k·y", "F(t)"],
+      "answer": 1,
+      "explanation": "c·y′ pushes back in proportion to velocity, the way a damper does. m·y″ is inertia, k·y is the spring, and F(t) is the outside push."
+    },
+    {
+      "id": "q4",
+      "prompt": "Why is the full pendulum equation θ″ + (g/L)·sin θ = 0 nonlinear?",
+      "options": [
+        "Because it has a second derivative",
+        "Because g and L are constants",
+        "Because the unknown θ is inside a sine",
+        "Because nothing pushes the pendulum"
+      ],
+      "answer": 2,
+      "explanation": "sin θ wraps the unknown inside a function. For small swings sin θ ≈ θ, which turns it into the linear spring equation."
+    },
+    {
+      "id": "q5",
+      "prompt": "How many initial conditions does y‴ + y = cos t need for a unique solution?",
+      "options": ["1", "2", "3", "None, cos t decides it"],
+      "answer": 2,
+      "explanation": "It's third order, so the general solution has three constants to pin down: y(0), y′(0) and y″(0). The forcing term affects the particular solution, not how many conditions you need.",
+      "hint": "Order and the number of starting facts go together."
+    }
+  ]
+}

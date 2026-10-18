@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lesson</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Literata:opsz,wght@7..72,400;7..72,600&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&display=swap">
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="stylesheet" href="shared/player.css">
+<link rel="stylesheet" href="shared/student.css">
+<script src="config.js"></script>
+</head>
+<body>
+<main class="page">
+  <div class="topbar"><a class="back" id="back" href="./">← All lessons</a><span id="who" class="muted"></span></div>
+  <section class="hero"><h1 id="title"></h1><p id="subtitle"></p></section>
+  <div id="player"></div>
+  <section class="quiz-section" id="quizSection" hidden>
+    <header><h2>Quiz</h2><button class="btn primary" id="startQuiz">Take the quiz</button></header>
+    <div id="quiz" hidden></div>
+  </section>
+</main>
+<script src="shared/students.js"></script>
+<script src="shared/quiz.js"></script>
+<script src="shared/player.js"></script>
+<script>
+(async () => {
+  const S = window.LessonStudents, params = new URLSearchParams(location.search), slug = params.get('l');
+  const preview = params.has('preview');   // tutor-mode preview: no score saving, no back link
+  const base = `lessons/${encodeURIComponent(slug)}/`, bust = preview ? `?v=${Date.now()}` : '';
+  const $ = id => document.getElementById(id);
+  if (preview) { document.body.classList.add('embed'); $('back').hidden = true; $('who').hidden = true; document.querySelector('.hero').hidden = true; }
+  const fail = msg => { $('player').textContent = msg; $('player').className = 'empty'; };
+  if (!slug) return fail('No lesson was chosen.');
+  let timeline, quiz = null, meta = {};
+  try { timeline = await (await fetch(base + 'timeline.json' + bust, { cache: 'no-store' })).json(); }
+  catch { return fail('This lesson has no audio yet. Build it in tutor mode first.'); }
+  try { const r = await fetch(base + 'quiz.json' + bust, { cache: 'no-store' }); if (r.ok) quiz = await r.json(); } catch {}
+  try { const r = await fetch(base + 'meta.json' + bust, { cache: 'no-store' }); if (r.ok) meta = await r.json(); } catch {}
+  document.title = timeline.title; $('title').textContent = timeline.title; $('subtitle').textContent = timeline.subtitle || '';
+  await new Promise((ok, bad) => { const s = document.createElement('script'); s.src = base + 'scenes.js' + bust; s.onload = ok; s.onerror = bad; document.body.append(s); })
+    .catch(() => fail('This lesson\'s animations could not be loaded.'));
+  const hasQuiz = quiz && quiz.questions && quiz.questions.length;
+  const startQuiz = () => {
+    $('quizSection').hidden = false; $('quiz').hidden = false; $('startQuiz').hidden = true;
+    LessonQuiz.mount($('quiz'), { quiz, onComplete: r => preview ? 'Preview only: scores are not saved.' :
+      S.recordAttempt({ slug, title: timeline.title, version: meta.version, watchedPct: maxPct, ...r }) });
+    $('quizSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const player = LessonPlayer.mount($('player'), {
+    timeline, audioUrl: base + 'lesson.mp3' + bust, onQuiz: hasQuiz ? startQuiz : null,
+    onError: preview ? (msg, scene, t) => parent.postMessage({ type: 'lesson-lab:scene-error', msg, scene, t }, '*') : null,
+  });
+  window.__player = player;
+  if (hasQuiz) { $('quizSection').hidden = false; $('startQuiz').onclick = startQuiz; }
+  // viewing progress: counts each second actually played, so skipping ahead doesn't count as watching
+  const seen = new Set(), totalSec = Math.max(1, Math.ceil(timeline.duration));
+  let maxPct = 0, lastSent = 0, prevT = 0;
+  player.audio.addEventListener('timeupdate', () => {
+    const t = player.audio.currentTime;
+    if (!player.audio.paused && t >= prevT && t - prevT < 1.5) for (let k = Math.floor(prevT); k <= Math.floor(t); k++) seen.add(k);
+    prevT = t;
+    maxPct = Math.min(1, seen.size / totalSec);
+    if (!preview && Date.now() - lastSent > 15000) { lastSent = Date.now(); S.recordProgress(slug, maxPct, false); }
+  });
+  player.audio.addEventListener('seeked', () => { prevT = player.audio.currentTime; });
+  player.audio.addEventListener('ended', () => { if (!preview) S.recordProgress(slug, maxPct, maxPct > .9); });
+  if (preview) {
+    window.addEventListener('message', e => { if (e.data?.type === 'lesson-lab:seek') player.preview(e.data.t); });
+    parent.postMessage({ type: 'lesson-lab:ready' }, '*');
+  }
+  if (!preview && S.enabled) { const u = await S.user(); if (u) $('who').textContent = `Signed in as ${u.name || u.email}`; }
+})();
+</script>
+</body>
+</html>
